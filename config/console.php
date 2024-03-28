@@ -5,5 +5,6 @@
 return [
     // 指令定义
     'commands' => [
+		'csv' => 'app\api\command\Csv',
     ],
 ];

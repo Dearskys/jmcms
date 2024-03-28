@@ -1,4 +1,5 @@
 <?php
+use think\facade\Env;
 
 // +----------------------------------------------------------------------
 // | 缓存设置
@@ -6,8 +7,7 @@
 
 return [
     // 默认缓存驱动
-    'default' => 'file',
-
+    'default' => Env::get('cache.driver', 'file'),
     // 缓存连接方式配置
     'stores'  => [
         'file' => [
@@ -25,5 +25,11 @@ return [
             'serialize'  => [],
         ],
         // 更多的缓存连接
+		'redis'   =>  [
+            // 驱动方式
+            'type'   => 'redis',
+            'host'       => 'r-2zeqkpz3r22xp2jtqzpd.redis.rds.aliyuncs.com',
+			'password'=>'YZik8Te6JKJpn5zS',
+        ],
     ],
 ];

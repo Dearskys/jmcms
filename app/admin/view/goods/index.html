@@ -1,0 +1,277 @@
+{extend name='common/container'}
+{block name="content"}
+<div style="margin:0 15px 15px 15px;">
+<el-row :gutter="10">
+<el-col :span="4" class="hidden-sm-and-down">
+	<left-tree :treelist="treeList" :search_data.sync="searchData" :left_expand="left_expand" fieldname="class_id" @refesh_list="index"></left-tree>
+</el-col>
+<el-col :xs="24" :sm="24" :md="20" :lg="20">
+<el-card shadow="never" style="min-height:650px;">
+<div v-if="dialog.showlist">
+<div v-if="search_visible" id="search" class="search">
+	<el-form ref="form" size="small" :model="searchData" inline>
+		<el-form-item label="商品名称">
+			<el-input id="goods_name" v-model="searchData.goods_name"  style="width:150px;" placeholder="请输入商品名称"></el-input>
+		</el-form-item>
+		<el-form-item label="所属分类">
+			<treeselect style="width:150px" :default-expand-level="2" v-model="searchData.class_id" :options="class_id" :normalizer="normalizer" :show-count="true" placeholder="请选择所属分类"/>
+		</el-form-item>
+		<el-form-item label="状态">
+			<el-select style="width:150px" v-model="searchData.status" filterable clearable placeholder="请选择">
+				<el-option key="0" label="开启" value="1"></el-option>
+				<el-option key="1" label="关闭" value="0"></el-option>
+			</el-select>
+		</el-form-item>
+		<el-form-item label="产地">
+			<el-input id="cd" v-model="searchData.cd"  style="width:150px;" placeholder="请输入产地"></el-input>
+		</el-form-item>
+		<el-form-item label="发布时间">
+			<el-date-picker value-format="yyyy-MM-dd HH:mm:ss" type="daterange" v-model="searchData.create_time" clearable range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期"></el-date-picker>
+		</el-form-item>
+		<search-tool :page_data.sync="page_data" :search_data.sync="searchData" @refesh_list="index"></search-tool>
+	</el-form>
+</div>
+<div class="btn-group" style="margin-top:10px;margin-bottom:10px;">
+	<div>
+		<el-button v-for="item in button_group" :key="item.access" v-if="checkPermission(item.access,'{:implode(',',session('admin.access'))}','{:session('admin.role_id')}',[1])" :disabled="$data[item.disabled]" :type="item.color" size="mini" :icon="item.icon" @click="fn(item.clickname)">
+			<span v-if="item.batch" v-text="$data['batchUpdateStatus']?'批量保存':'批量编辑'"></span>
+			<span v-else v-text="item.name"></span>
+		</el-button>
+	</div>
+	<div><table-tool tableid="goods" :search_visible.sync="search_visible"   @refesh_list="index"></table-tool></div>
+</div>
+<el-table id="goods" :row-class-name="rowClass" @selection-change="selection"  @row-click="handleRowClick"  row-key="goods_id"  :header-cell-style="{ background: '#eef1f6', color: '#606266' }" @sort-change='sortChange' v-loading="loading"  ref="multipleTable" border class="eltable" :data="list"  style="width: 100%">
+	<el-table-column align="center" type="selection" width="42"></el-table-column>
+	<el-table-column align="center" type = '' property="goods_id"  label="编号"  width="70">
+	</el-table-column>
+	<el-table-column align="left"  property="goods_name"  label="商品名称"  width="">
+	</el-table-column>
+	<el-table-column align="center"  property="goodscata.class_name"  label="分类名称" show-overflow-tooltip width="80">
+	</el-table-column>
+	<el-table-column align="center"  property="pic"  label="封面图"  width="90">
+		<template slot-scope="scope">
+			<div class="demo-image__preview">
+				<el-image v-if="scope.row.pic" class="table_list_pic" :src="scope.row.pic"  :preview-src-list="[scope.row.pic]"></el-image>
+			</div>
+		</template>
+	</el-table-column>
+	<el-table-column align="center"  property="sale_price" sortable='custom' label="销售价"  width="90">
+		<template slot-scope="scope">
+			<el-tag v-if="scope.row.sale_price" type="info" size="mini" effect="dark">{{scope.row.sale_price}}</el-tag>
+		</template>
+	</el-table-column>
+	<el-table-column align="center"  property="status"  label="状态"  width="90">
+		<template slot-scope="scope">
+			<el-switch @change="updateExt(scope.row,'status')" :active-value="1" :inactive-value="0" v-model="scope.row.status"></el-switch>
+		</template>
+	</el-table-column>
+	<el-table-column align="center"  property="sortid"  label="排序"  width="90">
+		<template class="sort" slot-scope="scope">
+			<el-input @blur.stop="updateExt(scope.row,'sortid')"  size="mini" placeholder="排序" v-model="scope.row.sortid"></el-input>
+		</template>
+	</el-table-column>
+	<el-table-column align="center"  property="create_time"  label="发布时间"  width="100">
+		<template slot-scope="scope">
+			{{parseTime(scope.row.create_time,'{y}-{m}-{d}')}}
+		</template>
+	</el-table-column>
+	<el-table-column :fixed="ismobile()?false:'right'" label="操作" align="center" width="190">
+		<template slot-scope="scope">
+			<div v-if="scope.row.goods_id">
+				<el-button v-if="checkPermission('/admin/Goods/update.html','{:implode(",",session("admin.access"))}','{:session("admin.role_id")}',[1])" size="mini" icon="el-icon-edit" type="primary" @click="update(scope.row)" >修改</el-button>
+				<el-button v-if="checkPermission('/admin/Goods/delete.html','{:implode(",",session("admin.access"))}','{:session("admin.role_id")}',[1])" size="mini" icon="el-icon-delete" type="danger" @click="del(scope.row)" >删除</el-button>
+			</div>
+		</template>
+	</el-table-column>
+</el-table>
+<Page :total="page_data.total" :page.sync="page_data.page" :limit.sync="page_data.limit" @pagination="index" />
+</div>
+
+<!--添加-->
+<Add @changepage="changepage" :show.sync="dialog.addDialogStatus" size="small" @refesh_list="index"></Add>
+<!--修改-->
+<Update :info="updateInfo" @changepage="changepage" :show.sync="dialog.updateDialogStatus" size="small" @refesh_list="index"></Update>
+<!--查看详情-->
+<Detail :info="detailInfo" @changepage="changepage" :show.sync="dialog.detailDialogStatus" size="small" @refesh_list="index"></Detail>
+
+</el-col>
+</el-row>
+</el-card>
+
+</div>
+
+{/block}
+{block name="script"}
+<script src="__PUBLIC__/assets/js/app.js"></script>
+<script src="__PUBLIC__/assets/libs/treeselect/vue-treeselect.umd.min.js"></script>
+<link rel="stylesheet" href="__PUBLIC__/assets/libs/treeselect/vue-treeselect.min.css">
+<script src="__PUBLIC__/assets/libs/vuedragable/Sortable.min.js"></script>
+<script src="__PUBLIC__/assets/libs/vuedragable/vuedraggable.umd.min.js"></script>
+<script src="__PUBLIC__/assets/editor/tinymce/tinymce.min.js"></script>
+<script src="__PUBLIC__/components/admin/goods/add.js?v=<?php echo rand(1000,9999)?>"></script>
+<script src="__PUBLIC__/components/admin/goods/update.js?v=<?php echo rand(1000,9999)?>"></script>
+<script src="__PUBLIC__/components/admin/goods/detail.js?v=<?php echo rand(1000,9999)?>"></script>
+<script>
+new Vue({
+	el: '#app',
+	components:{
+		'treeselect':VueTreeselect.Treeselect,
+		'draggable':window.vuedraggable,
+	},
+	data: function() {
+		return {
+			dialog: {
+				addDialogStatus : false,
+				updateDialogStatus : false,
+				detailDialogStatus : false,
+				showlist:true,
+			},
+			searchData:{},
+			button_group:[
+				{name:'添加',color:'success',access:'/admin/Goods/add.html',icon:'el-icon-plus',disabled:'',clickname:'add'},
+				{name:'修改',color:'primary',access:'/admin/Goods/update.html',icon:'el-icon-edit',disabled:'single',clickname:'update'},
+				{name:'删除',color:'danger',access:'/admin/Goods/delete.html',icon:'el-icon-delete',disabled:'multiple',clickname:'del'},
+				{name:'查看详情',color:'info',access:'/admin/Goods/detail.html',icon:'el-icon-view',disabled:'single',clickname:'detail'},
+			],
+			loading: false,
+			page_data: {
+				limit: 20,
+				page: 1,
+				total:20,
+			},
+			order:'',
+			sort:'',
+			ids: [],
+			single:true,
+			multiple:true,
+			search_visible:true,
+			left_expand:true,
+			list: [],
+			treeList:[],
+			class_id: [],
+			updateInfo:{},
+			detailInfo:{},
+		}
+	},
+	methods:{
+		index(){
+			let param = {limit:this.page_data.limit,page:this.page_data.page,order:this.order,sort:this.sort}
+			Object.assign(param, this.searchData,this.urlobj)
+			this.loading = true
+			axios.post(base_url + '/Goods/index',param).then(res => {
+				if(res.data.status == 200){
+					this.list = res.data.data.data
+					this.page_data.total = res.data.data.total
+					this.loading = false
+					if(this.page_data.page == 1){
+						this.treeList = res.data.sql_field_data.class_ids
+						this.class_id = res.data.sql_field_data.class_ids
+					}
+				}else{
+					this.$message.error(res.data.msg);
+				}
+			})
+		},
+		updateExt(row,field){
+			if(row.goods_id){
+				axios.post(base_url + '/Goods/updateExt',{goods_id:row.goods_id,[field]:row[field]}).then(res => {
+					if(res.data.status == 200){
+						this.$message({message: res.data.msg, type: 'success'})
+					}else{
+						this.$message.error(res.data.msg)
+					}
+				})
+			}
+		},
+		add(){
+			this.dialog.addDialogStatus = true
+			this.dialog.showlist = false
+		},
+		update(row){
+			let id = row.goods_id ? row.goods_id : this.ids.join(',')
+			axios.post(base_url + '/Goods/getUpdateInfo',{goods_id:id}).then(res => {
+				if(res.data.status == 200){
+					this.dialog.updateDialogStatus = true
+					this.dialog.showlist = false
+					this.updateInfo = res.data.data
+				}else{
+					this.$message.error(res.data.msg)
+				}
+			})
+		},
+		del(row){
+			this.$confirm('确定操作吗?', '提示', {
+				confirmButtonText: '确定',
+				cancelButtonText: '取消',
+				type: 'warning'
+			}).then(() => {
+				let ids = row.goods_id ? row.goods_id : this.ids.join(',')
+				axios.post(base_url + '/Goods/delete',{goods_id:ids}).then(res => {
+					if(res.data.status == 200){
+						this.$message({message: res.data.msg, type: 'success'})
+						this.index()
+					}else{
+						this.$message.error(res.data.msg)
+					}
+				})
+			}).catch(() => {})
+		},
+		detail(row){
+			this.dialog.detailDialogStatus = true
+			this.dialog.showlist = false
+			this.detailInfo = {goods_id:row.goods_id ? row.goods_id : this.ids.join(',')}
+		},
+		selection(selection) {
+			this.ids = selection.map(item => item.goods_id)
+			this.single = selection.length != 1
+			this.multiple = !selection.length
+		},
+		handleRowClick(row, rowIndex,event){
+			if(event.target.className !== 'el-input__inner'){
+				this.$refs.multipleTable.toggleRowSelection(row)
+			}
+		},
+		rowClass ({ row, rowIndex }) {
+			for(let i=0;i<this.ids.length;i++) {
+				if (row.goods_id === this.ids[i]) {
+					return 'rowLight'
+				}
+			}
+		},
+		sortChange(val){
+			if(val.order == 'descending'){
+				this.order= 'desc'
+			}
+			if(val.order == 'ascending'){
+				this.order= 'asc'
+			}
+			this.sort = val.prop
+			this.index()
+		},
+		/** 转换菜单数据结构 */
+		normalizer(node) {
+			if (node.children && !node.children.length) {
+				delete node.children
+			}
+			return {
+				id: node.val,
+				label: node.key,
+				children: node.children
+			}
+		},
+		changepage(){
+			this.dialog.showlist = true
+			this.dialog.addDialogStatus = false
+			this.dialog.updateDialogStatus = false
+			this.dialog.detailDialogStatus = false
+		},
+		fn(method){
+			this[method](this.ids)
+		},
+	},
+	mounted(){
+		this.index()
+	},
+})
+</script>
+{/block}
